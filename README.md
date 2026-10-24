@@ -1,3 +1,3 @@
 # notes-etudiants
 
-Version A
+Version B
