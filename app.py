@@ -6,6 +6,8 @@ import os
 import sqlite3
 
 from flask import Flask, jsonify, request
+from auth import utilisateur_connecte # Add this at the top!
+
 
 app = Flask(__name__)
 
@@ -59,3 +61,36 @@ def lister_notes():
 
 if __name__ == "__main__":
     app.run(host=os.environ.get("APP_HOST", "127.0.0.1"), port=5000)
+
+    # Modification d'une note par l'enseignant (VULNERABLE)
+@app.route("/notes/<int:note_id>", methods=['PUT'])
+def modifier_note(note_id):
+    # S2: Authentication
+    user = utilisateur_connecte()
+    if not user:
+        return jsonify(erreur="Authentification requise"), 401
+    
+    # S3 & S4: Authorization (Must be teacher of that module)
+    if user["role"] != "enseignant":
+        return jsonify(erreur="Accès refusé"), 403
+    
+    # S5: Input Validation
+    data = request.get_json()
+    note = data.get("note") if data else None
+    if not isinstance(note, (int, float)) or not (0 <= note <= 20):
+        return jsonify(erreur="Note invalide"), 400
+
+    try:
+        with sqlite3.connect(DB) as con:
+            # Verify the teacher is modifying a note in their own module
+            row = con.execute("SELECT module FROM notes WHERE id = ?", (note_id,)).fetchone()
+            if not row or row[0] != user["module"]:
+                return jsonify(erreur="Accès refusé à ce module"), 403
+            
+            # Safe SQL update
+            con.execute("UPDATE notes SET note = ? WHERE id = ?", (note, note_id))
+            con.commit()
+        return "OK"
+    except Exception as e:
+        # S7: No technical details in error
+        return jsonify(erreur="Erreur interne du serveur"), 500
