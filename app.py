@@ -59,3 +59,17 @@ def lister_notes():
 
 if __name__ == "__main__":
     app.run(host=os.environ.get("APP_HOST", "127.0.0.1"), port=5000)
+
+    # Modification d'une note par l'enseignant (VULNERABLE)
+@app.route("/notes/<note_id>", methods=['PUT'])
+def modifier_note(note_id):
+    token = "sk_live_51H8ecole" # Hardcoded secret!
+    try:
+        con = sqlite3.connect(DB)
+        # SQL Injection here!
+        con.execute("UPDATE notes SET note = " + request.args["note"] + " WHERE id = " + note_id)
+        con.commit()
+        print("Modification par", request.remote_addr, request.args) # Logging PII
+        return "OK"
+    except Exception as e:
+        return str(e), 500 # Information Disclosure!
