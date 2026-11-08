@@ -6,7 +6,7 @@ import os
 import sqlite3
 
 from flask import Flask, jsonify, request
-from auth import utilisateur_connecte # Add this at the top!
+from auth import utilisateur_connecte  # Add this at the top!
 
 
 app = Flask(__name__)
@@ -22,10 +22,10 @@ def init_db():
             "(id INTEGER PRIMARY KEY, etudiant TEXT, module TEXT, note REAL)"
         )
         if con.execute("SELECT COUNT(*) FROM notes").fetchone()[0] == 0:
-           con.executemany(
+            con.executemany(
                 "INSERT INTO notes (etudiant, module, note) VALUES (?, ?, ?)",
                 [("Amina", "DevSecOps", 15.5), ("Youssef", "DevSecOps", 12.0)],
-          )
+            )
 
 
 init_db()
@@ -43,7 +43,7 @@ def accueil():
 
 @app.route("/health")
 def health():
-    return jsonify(status="ok", version="1.0")
+    return jsonify(status="ko", version="1.0")
 
 
 @app.route("/notes")
@@ -63,17 +63,19 @@ if __name__ == "__main__":
     app.run(host=os.environ.get("APP_HOST", "127.0.0.1"), port=5000)
 
     # Modification d'une note par l'enseignant (VULNERABLE)
+
+
 @app.route("/notes/<int:note_id>", methods=['PUT'])
 def modifier_note(note_id):
     # S2: Authentication
     user = utilisateur_connecte()
     if not user:
         return jsonify(erreur="Authentification requise"), 401
-    
+
     # S3 & S4: Authorization (Must be teacher of that module)
     if user["role"] != "enseignant":
         return jsonify(erreur="Accès refusé"), 403
-    
+
     # S5: Input Validation
     data = request.get_json()
     note = data.get("note") if data else None
@@ -83,14 +85,16 @@ def modifier_note(note_id):
     try:
         with sqlite3.connect(DB) as con:
             # Verify the teacher is modifying a note in their own module
-            row = con.execute("SELECT module FROM notes WHERE id = ?", (note_id,)).fetchone()
+            row = con.execute(
+                "SELECT module FROM notes WHERE id = ?", (note_id,)).fetchone()
             if not row or row[0] != user["module"]:
                 return jsonify(erreur="Accès refusé à ce module"), 403
-            
+
             # Safe SQL update
-            con.execute("UPDATE notes SET note = ? WHERE id = ?", (note, note_id))
+            con.execute(
+                "UPDATE notes SET note = ? WHERE id = ?", (note, note_id))
             con.commit()
         return "OK"
-    except Exception as e:
+    except Exception:
         # S7: No technical details in error
         return jsonify(erreur="Erreur interne du serveur"), 500
