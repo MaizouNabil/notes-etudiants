@@ -98,3 +98,6 @@ def modifier_note(note_id):
     except Exception:
         # S7: No technical details in error
         return jsonify(erreur="Erreur interne du serveur"), 500
+
+
+    # Cette ligne est beaucoup trop longue pour respecter la norme PEP8 et va faire échouer le test de flake8 de manière certaine.
