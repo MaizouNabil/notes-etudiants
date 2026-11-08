@@ -1,38 +1,60 @@
-# Pipeline d'intégration continue de l'application des notes
 name: CI
 
-# Quand le pipeline se lance
 on:
   push:
     branches: [main]
-  pull_request: # déclencher aussi sur chaque pull request
-  workflow_dispatch: # à la demande, depuis l'onglet Actions
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  # Contrôle de chaque modification avant qu'elle n'entre dans main
+  # Job 1: Tests (Ce que vous avez déjà fait)
   tests:
-    runs-on: ubuntu-latest # une machine Linux fournie par GitHub
-    
+    runs-on: ubuntu-latest
     steps:
       - name: Récupérer le code
-        uses: actions/checkout@v4 # (v7 doesn't exist, v4 is current)
-
+        uses: actions/checkout@v4
       - name: Installer Python
-        uses: actions/setup-python@v5 # (v7 doesn't exist, v5 is current)
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Installer les dépendances
         run: pip install -r requirements.txt pytest flake8 bandit
-
-      # Le code respecte les règles d'écriture de l'équipe
       - name: Vérifier le style
         run: flake8 --max-line-length=100 *.py
-
-      # Le code ne contient pas de faille connue
       - name: Analyser la sécurité du code
         run: bandit app.py auth.py
-
-      # L'application rend le service attendu
       - name: Lancer les tests
         run: pytest -v
+
+  # Job 2: Livraison (Construire et publier l'image Docker)
+  image:
+    needs: tests # Ne s'exécute QUE si le job 'tests' passe au vert
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Seulement quand on push sur main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Autorisation d'écrire dans le registre GitHub (ghcr.io)
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      # Le registre exige un nom d'image en minuscules
+      - name: Nom de l'image en minuscules
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      # Connexion au registre d'images de GitHub
+      - name: Connexion au registre GitHub
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Construire et publier l'image
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:latest, ${{ env.IMAGE }}:${{ github.sha }}
