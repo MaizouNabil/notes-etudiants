@@ -4,6 +4,7 @@ from flask import request
 
 FICHIER_JETONS = os.environ.get("FICHIER_JETONS", "jetons.json")
 
+
 def utilisateur_connecte():
     entete = request.headers.get("Authorization", "")
     if not entete.startswith("Bearer "):
@@ -14,4 +15,3 @@ def utilisateur_connecte():
     except (FileNotFoundError, json.JSONDecodeError):
         return None
     return jetons.get(entete.removeprefix("Bearer "))
-    
